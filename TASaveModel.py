@@ -20,6 +20,7 @@ import base64
 import io
 import os
 from typing import List
+from tsunami_utils import log1p_selected
 
 # -----------------------------
 # Data preparation
@@ -38,16 +39,6 @@ def make_geo_groups(df, lat_col='latitude', lon_col='longitude', deg=5):
     lat_bin = np.floor((lat + 90) / deg).astype(int)
     lon_bin = np.floor((lon + 180) / deg).astype(int)
     return (lat_bin * 1000 + lon_bin)  # single integer group id
-
-# Small transforms for skewed positives
-def log1p_selected(X_df):
-    X_df = X_df.copy()
-    for col in ("dmin","gap","depth"):
-        if col in X_df:
-            vals = X_df[col].to_numpy()
-            shift = 1 - vals.min() if vals.min() <= 0 else 0.0
-            X_df[col] = np.log1p(vals + shift)
-    return X_df
 
 log_tx = FunctionTransformer(log1p_selected, feature_names_out="one-to-one")
 
