@@ -16,8 +16,6 @@ import matplotlib.pyplot as plt
 from sklearn.inspection import permutation_importance, PartialDependenceDisplay
 import RetriveCV
 import joblib
-import base64
-import io
 import os
 from typing import List
 from tsunami_utils import log1p_selected
