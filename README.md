@@ -25,7 +25,3 @@ Run the main analysis script:
 ```powershell
 python TsunamiAnalysis.py
 ```
-
-## Notes
-- Make sure your data retrieval in `RetriveCV.py` works or is adapted to your environment.
-- Add any additional dependencies to `requirements.txt` as needed.
