@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
 
+import os
 import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, render_template_string, request
@@ -58,10 +59,6 @@ ARTIFACT_DIR = Path("artifacts")
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 # Updated to reflect external training script's filename
 MODEL_PATH = ARTIFACT_DIR / "tsunami_model_bundle.pkl"
-
-import os
-print("Current working directory:", os.getcwd())
-print("Model path expected:", MODEL_PATH)
 
 # ----------------------
 # HTML (no training UI)
@@ -411,6 +408,5 @@ def predict_csv():
 
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
