@@ -46,7 +46,6 @@ matplotlib.use("Agg")
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.utils.validation import check_is_fitted
 import joblib
-from tsunami_utils import log1p_selected
 
 # ----------------------
 # Config
@@ -320,9 +319,12 @@ def sample_test():
     <body class="container">
     <main>
     {NAV_HTML}
-    <h2>Random Test Sample Prediction</h2>
+    <h2>Prediction on Random Test Sample</h2>
+    <p>This sample is data drawn randomly from the held-out test split stored in the model bundle and run through the model for prediction.</p>
+    <p><strong>Prediction:</strong> {{{{ pred }}}} (probability: {{{{ prob }}}}) | <strong>Grounded truth:</strong> {{{{ truth }}}}</p>
+    <p>0 is no tsunami, 1 is tsunami.</p>
+    <p></p>
     <p><strong>Saved threshold:</strong> {{{{ threshold }}}}</p>
-    <p><strong>Predicted probability:</strong> {{{{ prob }}}} | <strong>Predicted class:</strong> {{{{ pred }}}} | <strong>Ground truth:</strong> {{{{ truth }}}}</p>
     <table>
       <thead><tr><th>Feature</th><th>Value</th></tr></thead>
       <tbody>
