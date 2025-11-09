@@ -1,23 +1,22 @@
 import numpy as np, pandas as pd
 from sklearn.model_selection import (
-    GroupShuffleSplit, StratifiedGroupKFold, RandomizedSearchCV, PredefinedSplit
+    StratifiedGroupKFold, RandomizedSearchCV, PredefinedSplit
 )
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.calibration import CalibratedClassifierCV, CalibrationDisplay
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import (
     average_precision_score, roc_auc_score, precision_recall_curve,
     f1_score, precision_score, recall_score, confusion_matrix,
     roc_curve, auc
 )
 import matplotlib.pyplot as plt
-from sklearn.inspection import permutation_importance, PartialDependenceDisplay
+from sklearn.inspection import permutation_importance
 import RetriveCV
 import joblib
 import os
-from typing import List
 from tsunami_utils import log1p_selected
 
 # -----------------------------
@@ -28,7 +27,7 @@ df = RetriveCV.retrieve_earthquake_data()
 
 # Target and features
 TARGET = "tsunami" # Binary target: 1 if tsunami occurred, else 0
-FEATS = ['magnitude','cdi','mmi','sig','nst','dmin','gap','depth','latitude','longitude']
+FEATS = ['magnitude','depth','latitude','longitude','nst','dmin']
 
 # Create geographic groups by binning lat/lon
 def make_geo_groups(df, lat_col='latitude', lon_col='longitude', deg=5):
@@ -45,8 +44,21 @@ y = df[TARGET].astype(int).to_numpy()
 
 groups_all = make_geo_groups(df, deg=5)
 
-gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-train_idx, test_idx = next(gss.split(X, y, groups=groups_all))
+def grouped_stratified_train_test_split(X, y, groups, test_size=0.2, random_state=42):
+    n_splits = int(round(1.0 / test_size))
+    n_splits = max(2, n_splits)  # at least 2 folds
+
+    sgkf = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    # take the first fold as test; the rest as train
+    train_idx, test_idx = None, None
+    for fold_id, (tr, te) in enumerate(sgkf.split(X, y, groups)):
+        train_idx, test_idx = tr, te
+        break
+    return train_idx, test_idx
+
+train_idx, test_idx = grouped_stratified_train_test_split(
+    X, y, groups_all, test_size=0.2, random_state=42
+)
 
 X_train, y_train = X.iloc[train_idx], y[train_idx]
 X_test,  y_test  = X.iloc[test_idx],  y[test_idx]
@@ -149,7 +161,7 @@ imgs = {}
 # Confusion matrix
 cm = confusion_matrix(y_train, pred_train)
 plt.figure(); plt.imshow(cm, interpolation="nearest"); plt.title("Confusion Matrix (Train)"); plt.colorbar()
-ticks = np.arange(2); plt.xticks(ticks, ["True","False"]); plt.yticks(ticks, ["True","False"])
+ticks = np.arange(2); plt.xticks(ticks, ["False","True"]); plt.yticks(ticks, ["False","True"])
 for i in range(2):
     for j in range(2):
         plt.text(j, i, str(cm[i, j]), ha="center", va="center")
@@ -159,7 +171,7 @@ imgs["cmtrain"] = _fig_to_b64()
 # Confusion matrix
 cm = confusion_matrix(y_test, pred_test)
 plt.figure(); plt.imshow(cm, interpolation="nearest"); plt.title("Confusion Matrix (Test)"); plt.colorbar()
-ticks = np.arange(2); plt.xticks(ticks, ["True","False"]); plt.yticks(ticks, ["True","False"])
+ticks = np.arange(2); plt.xticks(ticks, ["False","True"]); plt.yticks(ticks, ["False","True"])
 for i in range(2):
     for j in range(2):
         plt.text(j, i, str(cm[i, j]), ha="center", va="center")
@@ -195,8 +207,6 @@ frac_pos = [np.mean(y_test[inds==i]) if np.any(inds==i) else np.nan for i in ran
 plt.figure(); plt.plot([0,1],[0,1],"--",label="Perfect"); plt.plot(centers, frac_pos, "o-", label="Empirical")
 plt.xlabel("Pred prob bin"); plt.ylabel("Observed frac positive"); plt.title("Calibration (Test)"); plt.legend()
 imgs["cal"] = _fig_to_b64()
-
-
 
 # Permutation importance (on test)
 from sklearn.inspection import permutation_importance

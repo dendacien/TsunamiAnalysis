@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.model_selection import (
-    GroupShuffleSplit, StratifiedGroupKFold, RandomizedSearchCV, PredefinedSplit
+    StratifiedGroupKFold, RandomizedSearchCV, PredefinedSplit
 )
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -15,6 +15,7 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 from sklearn.inspection import permutation_importance, PartialDependenceDisplay
 import RetriveCV
+from tsunami_utils import log1p_selected
 
 # -----------------------------
 # Data preparation
@@ -24,7 +25,7 @@ df = RetriveCV.retrieve_earthquake_data()
 
 # Target and features
 TARGET = "tsunami" # Binary target: 1 if tsunami occurred, else 0
-FEATS = ['magnitude','cdi','mmi','sig','nst','dmin','gap','depth','latitude','longitude']
+FEATS = ['magnitude','nst','dmin','depth','latitude','longitude']
 
 # Create geographic groups by binning lat/lon
 def make_geo_groups(df, lat_col='latitude', lon_col='longitude', deg=5):
@@ -34,16 +35,6 @@ def make_geo_groups(df, lat_col='latitude', lon_col='longitude', deg=5):
     lon_bin = np.floor((lon + 180) / deg).astype(int)
     return (lat_bin * 1000 + lon_bin)  # single integer group id
 
-# Small transforms for skewed positives
-def log1p_selected(X_df):
-    X_df = X_df.copy()
-    for col in ("dmin","gap","depth"):
-        if col in X_df:
-            vals = X_df[col].to_numpy()
-            shift = 1 - vals.min() if vals.min() <= 0 else 0.0
-            X_df[col] = np.log1p(vals + shift)
-    return X_df
-
 log_tx = FunctionTransformer(log1p_selected, feature_names_out="one-to-one")
 
 X = df[FEATS].copy()
@@ -51,8 +42,21 @@ y = df[TARGET].astype(int).to_numpy()
 
 groups_all = make_geo_groups(df, deg=5)
 
-gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-train_idx, test_idx = next(gss.split(X, y, groups=groups_all))
+def grouped_stratified_train_test_split(X, y, groups, test_size=0.2, random_state=42):
+    n_splits = int(round(1.0 / test_size))
+    n_splits = max(2, n_splits)  # at least 2 folds
+
+    sgkf = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    # take the first fold as test; the rest as train
+    train_idx, test_idx = None, None
+    for fold_id, (tr, te) in enumerate(sgkf.split(X, y, groups)):
+        train_idx, test_idx = tr, te
+        break
+    return train_idx, test_idx
+
+train_idx, test_idx = grouped_stratified_train_test_split(
+    X, y, groups_all, test_size=0.2, random_state=42
+)
 
 X_train, y_train = X.iloc[train_idx], y[train_idx]
 X_test,  y_test  = X.iloc[test_idx],  y[test_idx]
